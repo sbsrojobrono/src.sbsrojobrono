@@ -1,4 +1,4 @@
-export default {
+const client_manifest = {
   "_DAEAzu0T.js": {
     "resourceType": "script",
     "module": true,
@@ -167,4 +167,7 @@ export default {
       "node_modules/nuxt/dist/app/entry.js"
     ]
   }
-}
+};
+
+export { client_manifest as default };
+//# sourceMappingURL=client.manifest.mjs.map
