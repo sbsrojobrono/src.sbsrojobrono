@@ -1,4 +1,4 @@
-{
+const client_manifest = {
   "_C7z_7L6K.js": {
     "resourceType": "script",
     "module": true,
@@ -167,4 +167,7 @@
       "node_modules/nuxt/dist/app/entry.js"
     ]
   }
-}
+};
+
+export { client_manifest as default };
+//# sourceMappingURL=client.manifest.mjs.map

@@ -1,19 +1,117 @@
-import { effectScope, reactive, hasInjectionContext, getCurrentInstance, inject, toRef, version, unref, h, shallowRef, shallowReactive, isReadonly, isRef, isShallow, isReactive, toRaw, defineAsyncComponent, defineComponent, ref, provide, createElementBlock, computed, Suspense, nextTick, mergeProps, Transition, watch, withCtx, createVNode, useSSRContext, onErrorCaptured, onServerPrefetch, resolveDynamicComponent, createApp } from "vue";
-import { $fetch } from "ofetch";
-import { baseURL } from "#internal/nuxt/paths";
-import { createHooks } from "hookable";
-import { getContext } from "unctx";
-import { sanitizeStatusCode, createError as createError$1 } from "h3";
-import { getActiveHead } from "unhead";
-import { defineHeadPlugin } from "@unhead/shared";
-import { START_LOCATION, createMemoryHistory, createRouter as createRouter$1, useRoute as useRoute$1, RouterView } from "vue-router";
-import { withQuery, hasProtocol, parseURL, isScriptProtocol, joinURL, isSamePath } from "ufo";
-import { toRouteMatcher, createRouter } from "radix3";
-import { defuFn, defu } from "defu";
-import { klona } from "klona";
-import "devalue";
-import "destr";
-import { ssrRenderAttrs, ssrRenderComponent, ssrRenderSuspense, ssrRenderVNode } from "vue/server-renderer";
+import { version, unref, inject, defineAsyncComponent, defineComponent, ref, provide, createElementBlock, h, computed, shallowReactive, watch, Suspense, nextTick, Transition, hasInjectionContext, mergeProps, useSSRContext, createApp, effectScope, reactive, getCurrentInstance, onErrorCaptured, onServerPrefetch, createVNode, resolveDynamicComponent, toRef, shallowRef, isReadonly, withCtx, isRef, isShallow, isReactive, toRaw } from 'vue';
+import { $ as $fetch, w as withQuery, l as hasProtocol, p as parseURL, m as isScriptProtocol, n as joinURL, o as klona, q as defu, r as sanitizeStatusCode, t as defuFn, v as createHooks, h as createError$1, x as isSamePath, y as toRouteMatcher, z as createRouter$1 } from '../runtime.mjs';
+import { b as baseURL } from '../routes/renderer.mjs';
+import { getActiveHead } from 'unhead';
+import { defineHeadPlugin } from '@unhead/shared';
+import { useRoute as useRoute$1, RouterView, createMemoryHistory, createRouter, START_LOCATION } from 'vue-router';
+import { ssrRenderSuspense, ssrRenderComponent, ssrRenderVNode, ssrRenderAttrs } from 'vue/server-renderer';
+import 'node:http';
+import 'node:https';
+import 'fs';
+import 'path';
+import 'node:fs';
+import 'node:url';
+import 'vue-bundle-renderer/runtime';
+import 'devalue';
+import '@unhead/ssr';
+
+function createContext$1(opts = {}) {
+  let currentInstance;
+  let isSingleton = false;
+  const checkConflict = (instance) => {
+    if (currentInstance && currentInstance !== instance) {
+      throw new Error("Context conflict");
+    }
+  };
+  let als;
+  if (opts.asyncContext) {
+    const _AsyncLocalStorage = opts.AsyncLocalStorage || globalThis.AsyncLocalStorage;
+    if (_AsyncLocalStorage) {
+      als = new _AsyncLocalStorage();
+    } else {
+      console.warn("[unctx] `AsyncLocalStorage` is not provided.");
+    }
+  }
+  const _getCurrentInstance = () => {
+    if (als && currentInstance === void 0) {
+      const instance = als.getStore();
+      if (instance !== void 0) {
+        return instance;
+      }
+    }
+    return currentInstance;
+  };
+  return {
+    use: () => {
+      const _instance = _getCurrentInstance();
+      if (_instance === void 0) {
+        throw new Error("Context is not available");
+      }
+      return _instance;
+    },
+    tryUse: () => {
+      return _getCurrentInstance();
+    },
+    set: (instance, replace) => {
+      if (!replace) {
+        checkConflict(instance);
+      }
+      currentInstance = instance;
+      isSingleton = true;
+    },
+    unset: () => {
+      currentInstance = void 0;
+      isSingleton = false;
+    },
+    call: (instance, callback) => {
+      checkConflict(instance);
+      currentInstance = instance;
+      try {
+        return als ? als.run(instance, callback) : callback();
+      } finally {
+        if (!isSingleton) {
+          currentInstance = void 0;
+        }
+      }
+    },
+    async callAsync(instance, callback) {
+      currentInstance = instance;
+      const onRestore = () => {
+        currentInstance = instance;
+      };
+      const onLeave = () => currentInstance === instance ? onRestore : void 0;
+      asyncHandlers$1.add(onLeave);
+      try {
+        const r = als ? als.run(instance, callback) : callback();
+        if (!isSingleton) {
+          currentInstance = void 0;
+        }
+        return await r;
+      } finally {
+        asyncHandlers$1.delete(onLeave);
+      }
+    }
+  };
+}
+function createNamespace$1(defaultOpts = {}) {
+  const contexts = {};
+  return {
+    get(key, opts = {}) {
+      if (!contexts[key]) {
+        contexts[key] = createContext$1({ ...defaultOpts, ...opts });
+      }
+      contexts[key];
+      return contexts[key];
+    }
+  };
+}
+const _globalThis$1 = typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : typeof global !== "undefined" ? global : {};
+const globalKey$2 = "__unctx__";
+const defaultNamespace = _globalThis$1[globalKey$2] || (_globalThis$1[globalKey$2] = createNamespace$1());
+const getContext = (key, opts = {}) => defaultNamespace.get(key, opts);
+const asyncHandlersKey$1 = "__unctx_async_handlers__";
+const asyncHandlers$1 = _globalThis$1[asyncHandlersKey$1] || (_globalThis$1[asyncHandlersKey$1] = /* @__PURE__ */ new Set());
+
 if (!globalThis.$fetch) {
   globalThis.$fetch = $fetch.create({
     baseURL: baseURL()
@@ -370,7 +468,7 @@ function injectHead() {
     return _global[globalKey$1]();
   }
   const head = inject(headSymbol);
-  if (!head && process.env.NODE_ENV !== "production")
+  if (!head && "production" !== "production")
     console.warn("Unhead is missing Vue context, falling back to shared context. This may have unexpected results.");
   return head || getActiveHead();
 }
@@ -543,20 +641,19 @@ const nuxtLinkDefaults = { "componentName": "NuxtLink" };
 async function getRouteRules(url) {
   {
     const _routeRulesMatcher = toRouteMatcher(
-      createRouter({ routes: (/* @__PURE__ */ useRuntimeConfig()).nitro.routeRules })
+      createRouter$1({ routes: (/* @__PURE__ */ useRuntimeConfig()).nitro.routeRules })
     );
     return defu({}, ..._routeRulesMatcher.matchAll(url).reverse());
   }
 }
-const __nuxt_page_meta = null;
 const _routes = [
   {
     name: "index",
     path: "/",
     meta: {},
     alias: [],
-    redirect: __nuxt_page_meta == null ? void 0 : __nuxt_page_meta.redirect,
-    component: () => import("./_nuxt/index-BNAeGQMn.js").then((m) => m.default || m)
+    redirect: void 0 ,
+    component: () => import('./index-BNAeGQMn.mjs').then((m) => m.default || m)
   }
 ];
 const _wrapIf = (component, props, slots) => {
@@ -679,7 +776,7 @@ const plugin = /* @__PURE__ */ defineNuxtPlugin({
     const history = ((_a = routerOptions.history) == null ? void 0 : _a.call(routerOptions, routerBase)) ?? createMemoryHistory(routerBase);
     const routes = ((_b = routerOptions.routes) == null ? void 0 : _b.call(routerOptions, _routes)) ?? _routes;
     let startPosition;
-    const router = createRouter$1({
+    const router = createRouter({
       ...routerOptions,
       scrollBehavior: (to, from, savedPosition) => {
         if (from === START_LOCATION) {
@@ -870,9 +967,9 @@ const revive_payload_server_eJ33V7gbc6 = /* @__PURE__ */ defineNuxtPlugin({
     }
   }
 });
-const LazyIcon = defineAsyncComponent(() => import("./_nuxt/Icon-DrSA994a.js").then((r) => r["default"] || r.default || r));
-const LazyIconSvg = defineAsyncComponent(() => import("./_nuxt/IconSvg-CqQkWZ3R.js").then((r) => r["default"] || r.default || r));
-const LazyIconTw = defineAsyncComponent(() => import("./_nuxt/IconTw-CFrXOsUf.js").then((r) => r["default"] || r.default || r));
+const LazyIcon = defineAsyncComponent(() => import('./Icon-DrSA994a.mjs').then((r) => r["default"] || r.default || r));
+const LazyIconSvg = defineAsyncComponent(() => import('./IconSvg-CqQkWZ3R.mjs').then((r) => r["default"] || r.default || r));
+const LazyIconTw = defineAsyncComponent(() => import('./IconTw-CFrXOsUf.mjs').then((r) => r["default"] || r.default || r));
 const lazyGlobalComponents = [
   ["Icon", LazyIcon],
   ["IconSvg", LazyIconSvg],
@@ -926,7 +1023,7 @@ const plugins = [
   plugin_mDLvN651dt
 ];
 const layouts = {
-  default: () => import("./_nuxt/default-CL_5-sAb.js").then((m) => m.default || m)
+  default: () => import('./default-CL_5-sAb.mjs').then((m) => m.default || m)
 };
 const LayoutLoader = defineComponent({
   name: "LayoutLoader",
@@ -1222,8 +1319,8 @@ const _sfc_main$1 = {
     const statusMessage = _error.statusMessage ?? (is404 ? "Page Not Found" : "Internal Server Error");
     const description = _error.message || _error.toString();
     const stack = void 0;
-    const _Error404 = defineAsyncComponent(() => import("./_nuxt/error-404-BYJ0Ho5O.js").then((r) => r.default || r));
-    const _Error = defineAsyncComponent(() => import("./_nuxt/error-500-BZrlMiBn.js").then((r) => r.default || r));
+    const _Error404 = defineAsyncComponent(() => import('./error-404-BYJ0Ho5O.mjs').then((r) => r.default || r));
+    const _Error = defineAsyncComponent(() => import('./error-500-BZrlMiBn.mjs').then((r) => r.default || r));
     const ErrorTemplate = is404 ? _Error404 : _Error;
     return (_ctx, _push, _parent, _attrs) => {
       _push(ssrRenderComponent(unref(ErrorTemplate), mergeProps({ statusCode: unref(statusCode), statusMessage: unref(statusMessage), description: unref(description), stack: unref(stack) }, _attrs), null, _parent));
@@ -1300,16 +1397,6 @@ let entry;
   };
 }
 const entry$1 = (ssrContext) => entry(ssrContext);
-export {
-  _export_sfc as _,
-  useRuntimeConfig as a,
-  navigateTo as b,
-  useAppConfig as c,
-  useNuxtApp as d,
-  entry$1 as default,
-  injectHead as i,
-  nuxtLinkDefaults as n,
-  resolveUnrefHeadInput as r,
-  useRouter as u
-};
+
+export { _export_sfc as _, useRuntimeConfig as a, navigateTo as b, useAppConfig as c, useNuxtApp as d, entry$1 as default, injectHead as i, nuxtLinkDefaults as n, resolveUnrefHeadInput as r, useRouter as u };
 //# sourceMappingURL=server.mjs.map

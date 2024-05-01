@@ -1,0 +1,1 @@
+{"version":3,"file":"default-CL_5-sAb.js","sources":["../../../../layouts/default.vue"],"sourcesContent":["<template>\n  <slot></slot>\n</template>\n"],"names":[],"mappings":";;;;;;;;;;;;;;;;;;AAAA,SAAA,eAAA,MAAA,OAAA,SAAA,QAAA;;;;;;;;;;"}
